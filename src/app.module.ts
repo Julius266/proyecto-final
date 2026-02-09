@@ -26,6 +26,9 @@ import { HashtagsModule } from './hashtags/hashtags.module';
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: true, // TEMPORAL: Cambia a false después de crear las tablas
       logging: true,
+      ssl: {
+        rejectUnauthorized: false,
+      },
     }),
     AuthModule,
     StudentsModule,
