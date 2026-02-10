@@ -63,7 +63,13 @@ export class PostsService {
     return await this.postsRepository.save(post);
   }
 
-  async findAll(search?: string, hashtag?: string, userId?: number, type?: string, curriculumSubjectId?: number): Promise<Post[]> {
+  async findAll(
+    search?: string,
+    hashtag?: string,
+    userId?: number,
+    type?: string,
+    curriculumSubjectId?: number,
+  ): Promise<Post[]> {
     const queryBuilder = this.postsRepository
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.user', 'user')
@@ -91,7 +97,9 @@ export class PostsService {
     }
 
     if (curriculumSubjectId) {
-      queryBuilder.andWhere('post.curriculumSubjectId = :curriculumSubjectId', { curriculumSubjectId });
+      queryBuilder.andWhere('post.curriculumSubjectId = :curriculumSubjectId', {
+        curriculumSubjectId,
+      });
     }
 
     const posts = await queryBuilder.orderBy('post.createdAt', 'DESC').getMany();
@@ -121,19 +129,19 @@ export class PostsService {
             case 'exam':
               enriched.linkedEntity = await this.examsRepository.findOne({
                 where: { id: post.linkedEntityId },
-                relations: ['user'],
+                relations: ['user', 'curriculumSubject'],
               });
               break;
             case 'assignment':
               enriched.linkedEntity = await this.assignmentsRepository.findOne({
                 where: { id: post.linkedEntityId },
-                relations: ['user'],
+                relations: ['user', 'curriculumSubject'],
               });
               break;
             case 'project':
               enriched.linkedEntity = await this.projectsRepository.findOne({
                 where: { id: post.linkedEntityId },
-                relations: ['user'],
+                relations: ['user', 'curriculumSubject', 'subject'],
               });
               break;
           }
@@ -149,7 +157,14 @@ export class PostsService {
   async findOne(id: number): Promise<Post> {
     const post = await this.postsRepository.findOne({
       where: { id },
-      relations: ['user', 'hashtags', 'comments', 'comments.user', 'highlights', 'highlights.teacher'],
+      relations: [
+        'user',
+        'hashtags',
+        'comments',
+        'comments.user',
+        'highlights',
+        'highlights.teacher',
+      ],
     });
 
     if (!post) {
