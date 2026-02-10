@@ -42,7 +42,7 @@ export class CurriculumController {
     @Param('id') id: string,
     @Param('semester') semester: string,
   ) {
-    return this.curriculumService.getSubjectsByCurriculumAndSemester(
+    return this.curriculumService.getSubjectsBySemesterWithTeacherInfo(
       parseInt(id, 10),
       parseInt(semester, 10),
     );

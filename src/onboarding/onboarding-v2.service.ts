@@ -139,10 +139,10 @@ export class OnboardingV2Service {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('Usuario no encontrado');
     
-    // Permitir que usuarios sin rol asignado o con rol student puedan convertirse en teacher
-    // El rol se asigna/actualiza durante el onboarding
-    if (user.profileCompleted) {
-      throw new ConflictException('El perfil ya ha sido completado');
+    // Permitir re-configuración si el perfil ya está completado (edición)
+    // Solo bloqueamos si es un estudiante intentando ser docente
+    if (user.profileCompleted && user.role === UserRole.STUDENT) {
+      throw new ConflictException('Ya tienes un perfil de estudiante completado');
     }
 
     // Actualizar el rol a TEACHER si no lo es
@@ -162,31 +162,64 @@ export class OnboardingV2Service {
       throw new BadRequestException('Algunas materias no existen');
     }
 
-    // 3. Crear perfil del docente
-    const teacherProfile = new TeacherProfile();
-    teacherProfile.userId = userId;
-    teacherProfile.curriculumIds = dto.curriculumIds;
-    teacherProfile.institutionalEmail = dto.institutionalEmail;
-    teacherProfile.bio = dto.bio;
-    teacherProfile.visibility = dto.visibility || TeacherVisibility.ALL_CAREER;
-    
-    // Extraer los semestres únicos de las materias seleccionadas
-    const uniqueSemesters = [...new Set(subjects.map(s => s.semester))];
-    teacherProfile.semesterIds = uniqueSemesters;
+    // 3. Crear o actualizar perfil del docente
+    let teacherProfile = await this.teacherProfileRepository.findOne({
+      where: { userId },
+    });
+
+    if (teacherProfile) {
+      // Actualizar perfil existente
+      teacherProfile.curriculumIds = dto.curriculumIds;
+      teacherProfile.institutionalEmail = dto.institutionalEmail;
+      teacherProfile.bio = dto.bio;
+      teacherProfile.visibility = dto.visibility || TeacherVisibility.ALL_CAREER;
+      
+      // Extraer los semestres únicos de las materias seleccionadas
+      const uniqueSemesters = [...new Set(subjects.map((s) => s.semester))];
+      teacherProfile.semesterIds = uniqueSemesters;
+    } else {
+      // Crear nuevo perfil
+      teacherProfile = new TeacherProfile();
+      teacherProfile.userId = userId;
+      teacherProfile.curriculumIds = dto.curriculumIds;
+      teacherProfile.institutionalEmail = dto.institutionalEmail;
+      teacherProfile.bio = dto.bio;
+      teacherProfile.visibility = dto.visibility || TeacherVisibility.ALL_CAREER;
+      
+      // Extraer los semestres únicos de las materias seleccionadas
+      const uniqueSemesters = [...new Set(subjects.map((s) => s.semester))];
+      teacherProfile.semesterIds = uniqueSemesters;
+    }
 
     await this.teacherProfileRepository.save(teacherProfile);
 
-    // 4. Registrar las materias que dicta
+    // 4. Registrar las materias que dicta (evitando duplicados)
     const teacherSubjects = [];
     for (const subjectId of dto.subjectIds) {
-      const teacherSubject = this.teacherSubjectRepository.create({
-        teacherId: userId,
-        curriculumSubjectId: subjectId,
-        isActive: true,
+      // Verificar si ya existe esta relación
+      const existingTeacherSubject = await this.teacherSubjectRepository.findOne({
+        where: {
+          teacherId: userId,
+          curriculumSubjectId: subjectId,
+        },
       });
 
-      const saved = await this.teacherSubjectRepository.save(teacherSubject);
-      teacherSubjects.push(saved);
+      if (existingTeacherSubject) {
+        // Si ya existe, solo actualizar que está activo
+        existingTeacherSubject.isActive = true;
+        const saved = await this.teacherSubjectRepository.save(existingTeacherSubject);
+        teacherSubjects.push(saved);
+      } else {
+        // Si no existe, crear nuevo
+        const teacherSubject = this.teacherSubjectRepository.create({
+          teacherId: userId,
+          curriculumSubjectId: subjectId,
+          isActive: true,
+        });
+
+        const saved = await this.teacherSubjectRepository.save(teacherSubject);
+        teacherSubjects.push(saved);
+      }
     }
 
     // 5. ASIGNACIÓN AUTOMÁTICA: Vincular con estudiantes existentes que tengan esas materias

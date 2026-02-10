@@ -75,6 +75,7 @@ export class PostsService {
       .leftJoinAndSelect('post.user', 'user')
       .leftJoinAndSelect('post.hashtags', 'hashtag')
       .leftJoinAndSelect('post.comments', 'comment')
+      .leftJoinAndSelect('comment.user', 'commentUser')
       .leftJoinAndSelect('post.highlights', 'highlights')
       .leftJoinAndSelect('highlights.teacher', 'teacher');
 

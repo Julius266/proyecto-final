@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Curriculum } from './curriculum.entity';
 import { CurriculumSubject } from './curriculum-subject.entity';
+import { TeacherSubject } from '../students/teacher-subject.entity';
 import { CURRICULUM_DATA } from './curriculum-data';
 
 @Injectable()
@@ -14,6 +15,8 @@ export class CurriculumService implements OnModuleInit {
     private curriculumRepository: Repository<Curriculum>,
     @InjectRepository(CurriculumSubject)
     private curriculumSubjectRepository: Repository<CurriculumSubject>,
+    @InjectRepository(TeacherSubject)
+    private teacherSubjectRepository: Repository<TeacherSubject>,
   ) {}
 
   async onModuleInit() {
@@ -91,6 +94,39 @@ export class CurriculumService implements OnModuleInit {
       },
       order: { name: 'ASC' },
     });
+  }
+
+  async getSubjectsBySemesterWithTeacherInfo(curriculumId: number, semester: number) {
+    const subjects = await this.curriculumSubjectRepository.find({
+      where: {
+        curriculumId,
+        semester,
+        isActive: true,
+      },
+      order: { name: 'ASC' },
+    });
+
+    // Para cada materia, verificar si tiene docente asignado
+    const subjectsWithTeacherInfo = await Promise.all(
+      subjects.map(async (subject) => {
+        const teacherSubject = await this.teacherSubjectRepository.findOne({
+          where: {
+            curriculumSubjectId: subject.id,
+            isActive: true,
+          },
+          relations: ['teacher'],
+        });
+
+        return {
+          ...subject,
+          hasTeacher: !!teacherSubject,
+          teacherId: teacherSubject?.teacherId || null,
+          teacherName: teacherSubject?.teacher?.name || null,
+        };
+      }),
+    );
+
+    return subjectsWithTeacherInfo;
   }
 
   async getAllSubjectsByCurriculum(curriculumId: number) {

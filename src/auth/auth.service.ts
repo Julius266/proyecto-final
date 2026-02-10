@@ -49,6 +49,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         profileCompleted: user.profileCompleted || false,
+        profileImage: user.profileImage || null,
       },
     };
   }
@@ -81,6 +82,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         profileCompleted: user.profileCompleted || false,
+        profileImage: user.profileImage || null,
       },
     };
   }

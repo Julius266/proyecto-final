@@ -3,7 +3,7 @@ import { User } from './student.entity';
 import { CurriculumSubject } from '../curriculum/curriculum-subject.entity';
 
 @Entity('teacher_subjects')
-@Unique(['curriculumSubjectId']) // Solo un docente por materia específica
+@Unique(['teacherId', 'curriculumSubjectId']) // Un docente puede dictar una materia solo una vez
 export class TeacherSubject {
   @PrimaryGeneratedColumn('increment', { type: 'bigint' })
   id: number;
