@@ -1,9 +1,11 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { StudentsService } from '../students/students.service';
 import { LoginDto } from './dto/login.dto';
 import { User } from '../students/student.entity';
+import { CreateUserDto } from '../students/dto/create-student.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -46,6 +48,7 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
+        profileCompleted: user.profileCompleted || false,
       },
     };
   }
@@ -56,5 +59,67 @@ export class AuthService {
       throw new UnauthorizedException('Usuario no encontrado');
     }
     return user;
+  }
+
+  async register(createUserDto: CreateUserDto) {
+    // Crear el usuario
+    const user = await this.studentsService.create(createUserDto);
+
+    // Generar token JWT automáticamente
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    };
+
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profileCompleted: user.profileCompleted || false,
+      },
+    };
+  }
+
+  async changePassword(userId: number, changePasswordDto: ChangePasswordDto) {
+    const user = await this.studentsService.findByEmailWithPassword(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+
+    // Verificar contraseña actual
+    const isPasswordValid = await bcrypt.compare(
+      changePasswordDto.currentPassword,
+      user.password,
+    );
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('La contraseña actual es incorrecta');
+    }
+
+    // Hashear nueva contraseña y actualizar
+    const hashedPassword = await bcrypt.hash(changePasswordDto.newPassword, 10);
+    await this.studentsService.updatePassword(userId, hashedPassword);
+
+    return {
+      message: 'Contraseña actualizada exitosamente',
+    };
+  }
+
+  async getMe(userId: number) {
+    const user = await this.studentsService.findOne(userId);
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      profileCompleted: user.profileCompleted || false,
+      profileImage: user.profileImage || null,
+    };
   }
 }

@@ -9,14 +9,13 @@ import {
   ParseIntPipe,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../students/student.entity';
 
@@ -31,7 +30,7 @@ export class PostsController {
   @ApiOperation({ summary: 'Crear una nueva publicación (requiere autenticación)' })
   @ApiResponse({ status: 201, description: 'Publicación creada exitosamente' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  create(@Body() createPostDto: CreatePostDto, @CurrentUser() user: any) {
+  create(@Body() createPostDto: CreatePostDto) {
     return this.postsService.create(createPostDto);
   }
 
@@ -40,13 +39,21 @@ export class PostsController {
   @ApiQuery({ name: 'search', required: false, description: 'Buscar en el contenido' })
   @ApiQuery({ name: 'hashtag', required: false, description: 'Filtrar por hashtag' })
   @ApiQuery({ name: 'userId', required: false, description: 'Filtrar por usuario' })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Filtrar por tipo de publicación (general, exam, assignment, project, resource)',
+  })
+  @ApiQuery({ name: 'curriculumSubjectId', required: false, description: 'Filtrar por materia' })
   @ApiResponse({ status: 200, description: 'Lista de publicaciones' })
   findAll(
     @Query('search') search?: string,
     @Query('hashtag') hashtag?: string,
     @Query('userId') userId?: number,
+    @Query('type') type?: string,
+    @Query('curriculumSubjectId') curriculumSubjectId?: number,
   ) {
-    return this.postsService.findAll(search, hashtag, userId);
+    return this.postsService.findAll(search, hashtag, userId, type, curriculumSubjectId);
   }
 
   @Get(':id')
@@ -68,14 +75,24 @@ export class PostsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Eliminar una publicación (solo ADMIN)' })
+  @ApiOperation({ summary: 'Eliminar una publicación (propietario o ADMIN)' })
   @ApiResponse({ status: 200, description: 'Publicación eliminada' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'No tienes permisos (requiere rol ADMIN)' })
-  remove(@Param('id', ParseIntPipe) id: number) {
+  @ApiResponse({ status: 403, description: 'No tienes permisos para eliminar esta publicación' })
+  async remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    // Verificar que el usuario sea el propietario o un admin
+    const post = await this.postsService.findOne(id);
+
+    // Convertir a número para comparar correctamente (bigint puede venir como string)
+    const postUserId = Number(post.userId);
+    const currentUserId = Number(user.userId);
+
+    if (postUserId !== currentUserId && user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('No tienes permisos para eliminar esta publicación');
+    }
+
     return this.postsService.remove(id);
   }
 }

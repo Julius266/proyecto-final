@@ -4,9 +4,11 @@ import { Assignment } from '../assignments/assignment.entity';
 import { Project } from '../projects/project.entity';
 import { Post } from '../posts/post.entity';
 import { Comment } from '../comments/comment.entity';
+import { Like } from '../likes/like.entity';
 
 export enum UserRole {
   STUDENT = 'student',
+  TEACHER = 'teacher',
   ADMIN = 'admin',
 }
 
@@ -31,6 +33,12 @@ export class User {
   })
   role: UserRole;
 
+  @Column({ type: 'boolean', default: false, name: 'profile_completed' })
+  profileCompleted: boolean;
+
+  @Column({ type: 'text', nullable: true, name: 'profile_image' })
+  profileImage: string;
+
   @CreateDateColumn({ type: 'timestamp with time zone', name: 'registration_date' })
   registrationDate: Date;
 
@@ -48,4 +56,7 @@ export class User {
 
   @OneToMany(() => Comment, (comment) => comment.user)
   comments: Comment[];
+
+  @OneToMany(() => Like, (like) => like.user)
+  likes: Like[];
 }

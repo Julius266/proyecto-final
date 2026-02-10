@@ -60,7 +60,7 @@ export class StudentsService {
   async findByEmail(email: string): Promise<User> {
     return await this.usersRepository.findOne({
       where: { email },
-      select: ['id', 'name', 'email', 'password', 'role', 'registrationDate'],
+      select: ['id', 'name', 'email', 'password', 'role', 'registrationDate', 'profileCompleted', 'profileImage'],
     });
   }
 
@@ -73,5 +73,16 @@ export class StudentsService {
   async remove(id: number): Promise<void> {
     const user = await this.findOne(id);
     await this.usersRepository.remove(user);
+  }
+
+  async findByEmailWithPassword(userId: number): Promise<User> {
+    return await this.usersRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'name', 'email', 'password', 'role', 'registrationDate', 'profileCompleted', 'profileImage'],
+    });
+  }
+
+  async updatePassword(userId: number, hashedPassword: string): Promise<void> {
+    await this.usersRepository.update(userId, { password: hashedPassword });
   }
 }

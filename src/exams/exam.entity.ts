@@ -1,27 +1,56 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Subject } from '../subjects/subject.entity';
 import { User } from '../students/student.entity';
+import { CurriculumSubject } from '../curriculum/curriculum-subject.entity';
 
 @Entity('exams')
 export class Exam {
   @PrimaryGeneratedColumn('increment', { type: 'bigint' })
   id: number;
 
-  @Column({ type: 'bigint', name: 'subject_id' })
-  subjectId: number;
-
   @Column({ type: 'bigint', name: 'user_id' })
   userId: number;
 
-  @Column({ type: 'date' })
-  date: Date;
+  // Referencia a la materia del curriculum (integración con onboarding)
+  @Column({ type: 'bigint', name: 'curriculum_subject_id', nullable: true })
+  curriculumSubjectId: number;
+
+  // Mantener compatibilidad con el sistema anterior
+  @Column({ type: 'bigint', name: 'subject_id', nullable: true })
+  subjectId: number;
+
+  @Column({ type: 'text', nullable: true })
+  title: string;
 
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @ManyToOne(() => Subject, (subject) => subject.exams)
+  @Column({ type: 'date' })
+  date: Date;
+
+  // Archivos adjuntos (URLs de Cloudinary)
+  @Column({ type: 'jsonb', nullable: true, default: '[]' })
+  attachments: Array<{
+    url: string;
+    publicId: string;
+    fileName: string;
+    fileType: string; // 'image', 'video', 'document'
+    uploadedAt: Date;
+  }>;
+
+  @CreateDateColumn({ type: 'timestamp with time zone', name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ type: 'timestamp with time zone', name: 'updated_at' })
+  updatedAt: Date;
+
+  @ManyToOne(() => Subject, (subject) => subject.exams, { nullable: true })
   @JoinColumn({ name: 'subject_id' })
   subject: Subject;
+
+  @ManyToOne(() => CurriculumSubject, { nullable: true })
+  @JoinColumn({ name: 'curriculum_subject_id' })
+  curriculumSubject: CurriculumSubject;
 
   @ManyToOne(() => User, (user) => user.exams)
   @JoinColumn({ name: 'user_id' })
