@@ -9,14 +9,14 @@ import {
   ParseIntPipe,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../students/student.entity';
 
 @ApiTags('comments')
@@ -61,14 +61,24 @@ export class CommentsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Eliminar un comentario (solo admin)' })
+  @ApiOperation({ summary: 'Eliminar un comentario (propietario o ADMIN)' })
   @ApiResponse({ status: 200, description: 'Comentario eliminado' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
-  @ApiResponse({ status: 403, description: 'Sin permisos (solo admin)' })
-  remove(@Param('id', ParseIntPipe) id: number) {
+  @ApiResponse({ status: 403, description: 'No tienes permisos para eliminar este comentario' })
+  async remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    // Verificar que el usuario sea el propietario o un admin
+    const comment = await this.commentsService.findOne(id);
+
+    // Convertir a número para comparar correctamente (bigint puede venir como string)
+    const commentUserId = Number(comment.userId);
+    const currentUserId = Number(user.userId);
+
+    if (commentUserId !== currentUserId && user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('No tienes permisos para eliminar este comentario');
+    }
+
     return this.commentsService.remove(id);
   }
 }
